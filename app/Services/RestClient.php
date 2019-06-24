@@ -144,8 +144,8 @@ class RestClient
     {
         foreach (json_decode($body) as $key => $value) {
             $output['origin%' . $key] = $value;
-         }
-
+        }
+        
         return $output;
     }
 
@@ -351,4 +351,28 @@ class RestClient
         return $this->services->resolveInstance($action->getService()) . $url;
     }
 
+    // /**
+    //  * @param array $body
+    //  * @param array $params
+    //  * @param string $prefix
+    //  * @return array
+    //  */
+    // private function injectBodyParams(array $body, array $params, $prefix = ''): array
+    // {
+    //     foreach ($params as $key => $value) {
+    //         if (is_string($value) || is_numeric($value)) {
+    //             foreach ($body as $bodyParam => $bodyValue) {
+    //                 $body[$bodyParam] = str_replace("{{$prefix}{$key}}", $value, $bodyValue);
+    //             }
+    //         } else if (is_array($value)) {
+    //             foreach ($body as $bodyParam => $bodyValue) {
+    //                 if ($bodyValue === "{{$prefix}{$key}}") {
+    //                     $body[$bodyParam] = $value;
+    //                 }
+    //             }
+    //         }
+    //     }
+
+    //     return $body;
+    // }  
 }

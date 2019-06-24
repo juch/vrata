@@ -549,11 +549,17 @@ fields will be empty.
 We only take "data" JSON property from both responses and we inject it to the final response as
  "venue.clients" and "venue.metadata".
 
+<<<<<<< HEAD
 ### Example 3: Multiple microservices with aggregate POST / PUT / DELETE requests
 
 Initial body of your POST, PUT or DELETE request come with origin tag usable in your json. You can use in your actions an optionnal body parameters for each requests. You can use origin tag to use the body sent in your initial request. You can also use the response of each actions in the body param like in a GET aggregate request. 
 
 ```json
+=======
+ ### Example 3: Multiple microservices with aggregate POST / PUT / DELETE requests
+ Initial body of your POST, PUT or DELETE request come with origin tag usable in your json. You can use in your actions an optionnal body parameters for each requests. You can use origin tag to use the body sent in your initial request. You can also use the response of each actions in the body param like in a GET aggregate request. 
+ ```json
+>>>>>>> [chore] Allow POST, PUT, DELETE actions in aggregate request
 {
 	"aggregate": true,
 	"method": "PUT",
@@ -603,7 +609,10 @@ Initial body of your POST, PUT or DELETE request come with origin tag usable in 
 }
 ```
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> [chore] Allow POST, PUT, DELETE actions in aggregate request
 ## License
 
 The MIT License (MIT)
