@@ -35,7 +35,9 @@ class GatewayController extends Controller
      */
     public function __construct(Request $request)
     {
-        if (empty($request->getRoute())) throw new DataFormatException('Unable to find original URI pattern');
+        if (empty($request->getRoute())) {
+            throw new DataFormatException('Unable to find original URI pattern');
+        }
 
         $this->config = $request
             ->getRoute()

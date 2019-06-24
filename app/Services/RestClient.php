@@ -57,7 +57,7 @@ class RestClient
     {
         $this->client = $client;
         $this->services = $services;
-        $this->whiteListedHeaders = config('gateway.headers', []);
+        $this->whiteListedHeaders = config('gateway.headers-forwarded-whitelist', []);
         $this->injectHeaders($request);
     }
 
@@ -262,11 +262,13 @@ class RestClient
             return $response['state'] != 'fulfilled';
         })->each(function ($response, $alias) use ($wrapper) {
             $response = $response['reason']->getResponse();
-           
-            if ($wrapper->hasCriticalActions()) throw new UnableToExecuteRequestException($response);
-
+            if ($wrapper->hasCriticalActions()) {
+                throw new UnableToExecuteRequestException($response);
+            }
             // Do we have an error response from the service?
-            if (! $response) $response = new PsrResponse(502, []);
+            if (! $response) {
+                $response = new PsrResponse(502, []);
+            }
             $wrapper->addFailedAction($alias, $response);
         });
 
