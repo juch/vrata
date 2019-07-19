@@ -32,6 +32,11 @@ class RestClient
     /**
      * @var array
      */
+    protected $whiteListedHeaders;
+
+    /**
+     * @var array
+     */
     protected $guzzleParams = [
         'headers' => [],
         'timeout' => 40
@@ -52,6 +57,7 @@ class RestClient
     {
         $this->client = $client;
         $this->services = $services;
+        $this->whiteListedHeaders = config('gateway.headers', []);
         $this->injectHeaders($request);
     }
 
@@ -60,16 +66,25 @@ class RestClient
      */
     private function injectHeaders(Request $request)
     {
-        $this->setHeaders(
-            [
-                'X-User' => $request->user()->id ?? self::USER_ID_ANONYMOUS,
-                'X-Token-Scopes' => $request->user() && ! empty($request->user()->token()) ? implode(',', $request->user()->token()->scopes) : '',
-                'X-Client-Ip' => $request->getClientIp(),
-                'User-Agent' => $request->header('User-Agent'),
-                'Content-Type' => 'application/json',
-                'Accept' => 'application/json'
-            ]
-        );
+        $headers = [
+            'X-User' => $request->user()->id ?? self::USER_ID_ANONYMOUS,
+            'X-Token-Scopes' => $request->user() && ! empty($request->user()->token()) ? implode(',', $request->user()->token()->scopes) : '',
+            'X-Client-Ip' => $request->getClientIp(),
+            'User-Agent' => $request->header('User-Agent'),
+            'Content-Type' => 'application/json',
+            'Accept' => 'application/json'
+        ];
+
+        // Check if there are whitelisted custom headers
+        foreach ($this->whiteListedHeaders as $key) {
+            if ($request->headers->has($key)) {
+                $headers[$key] = $request->headers->get($key);
+            }
+        }
+        
+        $this->setHeaders($headers);
+
+        $headers = null;
     }
 
     /**
