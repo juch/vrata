@@ -5,7 +5,14 @@ return (static function() {
         // List of microservices behind the gateway
         'services' => [
             'core' => [],
-            'login' => []
+            'login' => [],
+            'rds' => [],
+            'tpt-salles' => [
+                'hostname' => 'localhost:8081'
+            ],
+            'agro-salles' => [
+                'hostname' => 'localhost:8082'
+            ],
         ],
 
         // Array of extra (eg. aggregated) routes
@@ -13,53 +20,52 @@ return (static function() {
             [
                 'aggregate' => true,
                 'method' => 'GET',
-                'path' => '/v1/devices/{mac}/details',
+                // 'path' => '/v1/salles/{id}',
+                'path' => '/salles',
+                'public' => false,
+                'raw' => false,
                 'actions' => [
-                    'device' => [
-                        'service' => 'core',
+                    'tpt' => [
+                        'service' => 'tpt-salles',
                         'method' => 'GET',
-                        'path' => 'devices/{mac}',
+                        'path' => 'salles',
                         'sequence' => 0,
-                        'critical' => true
+                        'output_key' => [
+                            'data' => 'tpt',
+                        ],
+                        'critical' => false,
                     ],
-                    'ping' => [
-                        'service' => 'core',
-                        'output_key' => false,
-                        'method' => 'POST',
-                        'path' => 'devices/{mac}/ping',
+                    'agro' => [
+                        'service' => 'agro-salles',
+                        'method' => 'GET',
+                        'path' => 'salles',
                         'sequence' => 0,
-                        'critical' => false
+                        'output_key' => [
+                            'data' => 'agro',
+                        ],
+                        'critical' => false,
                     ],
-                    'settings' => [
-                        'service' => 'core',
-                        'output_key' => 'network.settings',
-                        'method' => 'GET',
-                        'path' => 'networks/{device%network_id}',
-                        'sequence' => 1,
-                        'critical' => false
-                    ],
-                    'clients' => [
-                        'service' => 'login',
-                        'output_key' => 'network.clients',
-                        'method' => 'GET',
-                        'path' => 'visitors/{device%network_id}',
-                        'sequence' => 1,
-                        'critical' => false
-                    ]
-                ]
-            ]
+                ],
+            ],
         ],
 
         // Global parameters
         'global' => [
             'prefix' => '/v1',
-            'timeout' => 5.0,
+            'timeout' => 2.0, // in seconds
+            'connect_timeout' => 1.0, // in seconds
             'doc_point' => '/api/doc',
-            'domain' => 'local.pwred.com'
+            'domain' => 'localhost:8888'
+        ],
+
+        // Header white list to forward to micro services
+        'headers-forwarded-whitelist' => [
+            'X-SYNAPSES-APP',
+            'X-SYNAPSES-USER',
         ],
     ];
 
-    $sections = ['services', 'routes', 'global'];
+    $sections = ['services', 'routes', 'global', 'headers-forwarded-whitelist'];
 
     foreach ($sections as $section) {
         $config = env('GATEWAY_' . strtoupper($section), false);
