@@ -71,12 +71,13 @@ $app->singleton('filesystem', function ($app) {
 $app->routeMiddleware([
     'auth' => App\Http\Middleware\Authenticate::class,
     'helper' => \App\Http\Middleware\HelperMiddleware::class,
+    'perimeters' => \App\Http\Middleware\AddUserPerimeters::class,
 ]);
 
 $app->middleware([
     \Barryvdh\Cors\HandleCors::class,
-    \App\Http\Middleware\Throttle::class
-//    \App\Http\Middleware\AddCORSHeader::class
+    \App\Http\Middleware\Throttle::class,
+    \App\Http\Middleware\AddCORSHeader::class
 ]);
 
 /*
@@ -97,6 +98,7 @@ $app->register(\Barryvdh\Cors\LumenServiceProvider::class);
 $app->register(App\Providers\AuthServiceProvider::class);
 
 if ($app->environment() != 'testing') {
+    $app->configure('hub');
     $app->configure('gateway');
     $app->register(App\Providers\AppServiceProvider::class);
 }

@@ -603,7 +603,6 @@ Initial body of your POST, PUT or DELETE request come with origin tag usable in 
 }
 ```
 
-
 ## License
 
 The MIT License (MIT)

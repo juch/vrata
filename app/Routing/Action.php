@@ -91,6 +91,14 @@ class Action implements ActionContract
     }
 
     /**
+     * @return string
+     */
+    public function getRole()
+    {
+        return $this->config['role'];
+    }
+
+    /**
      * @param string $service
      * @return $this
      */

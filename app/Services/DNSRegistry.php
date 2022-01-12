@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Exceptions\UnknownServiceException;
+
 /**
  * Class DNSRegistry
  * @package App\Services
@@ -14,11 +16,24 @@ class DNSRegistry implements ServiceRegistryContract
      */
     public function resolveInstance($serviceId)
     {
-        $config = config('gateway');
+        $gatewayConfig = config('gateway');
+        $hubConfig = config('hub');
 
-        // If service doesn't have a specific URL, simply append global domain to service name
-        $hostname = $config['services'][$serviceId]['hostname'] ?? $serviceId . '.' . $config['global']['domain'];
+        if (empty($hubConfig)) {
+            // If service doesn't have a specific URL, simply append global domain to service name
+            $hostname = $gatewayConfig['services'][$serviceId]['hostname'] ?? $serviceId . '.' . $gatewayConfig['global']['domain'];
+        } else {
+            // If hubs are defined service name concatain hubname%servicename
+            if (false === strpos($serviceId, '%')) {
+                throw new UnknownServiceException(null, $serviceId);
+            }
+            list($apiId, $serviceId) = explode('%', $serviceId);
+            $hostname = $hubConfig['apis'][$apiId]['hostname'] ?? $gatewayConfig['global']['domain'];
+            $hostname = isset($gatewayConfig['services'][$serviceId]['path']) ? 
+                $hostname . '/' . $gatewayConfig['services'][$serviceId]['path'] :
+                $serviceId . '.' . $hostname;
+        }
 
-        return 'http://' .  $hostname;
+        return "http://$hostname";
     }
 }

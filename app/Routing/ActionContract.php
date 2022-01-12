@@ -63,6 +63,11 @@ interface ActionContract
     public function getService();
 
     /**
+     * @return string
+     */
+    public function getRole();
+
+    /**
      * @return bool
      */
     public function isCritical();
