@@ -2,9 +2,10 @@
 
 namespace App\Routing;
 
-use Illuminate\Support\Facades\Storage;
-use Laravel\Lumen\Application;
 use Webpatser\Uuid\Uuid;
+use App\Routing\ApiRegistry;
+use Laravel\Lumen\Application;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * Class RouteRegistry
@@ -18,10 +19,27 @@ class RouteRegistry
     protected $routes = [];
 
     /**
+     * @var ApiRegistry
+     */
+    protected $apiRegistry = null;
+
+    /**
      * RouteRegistry constructor.
      */
-    public function __construct()
+    public function __construct(ApiRegistry $apiRegistry, string $filename = null)
     {
+        $this->apiRegistry = $apiRegistry;
+
+        $filename = $filename ?: 'routes.json';
+
+        if (Storage::exists($filename)) {
+            $routes = json_decode(Storage::get($filename), true);
+            if ($routes !== null) {
+                // We want to re-parse config routes to allow route overwriting
+                $this->parseRoutes($routes);
+            }
+        }
+
         $this->parseConfigRoutes();
     }
 
@@ -69,8 +87,10 @@ class RouteRegistry
             $method = strtolower($route->getMethod());
 
             $middleware = [ 'helper:' . $route->getId() ];
-            if (! $route->isPublic()) $middleware[] = 'auth';
-
+            if (! $route->isPublic()) {
+                $middleware[] = 'auth';
+                $middleware[] = 'perimeters';
+            }
             $app->router->{$method}($route->getPath(), [
                 'uses' => 'App\Http\Controllers\GatewayController@' . $method,
                 'middleware' => $middleware
@@ -84,28 +104,11 @@ class RouteRegistry
     private function parseConfigRoutes()
     {
         $config = config('gateway');
-        if (empty($config)) return $this;
-
-        $this->parseRoutes($config['routes']);
+        if (!empty($config)) {
+            $this->parseRoutes($config['routes']);
+        }
 
         return $this;
-    }
-
-    /**
-     * @param string $filename
-     * @return RouteRegistry
-     */
-    public static function initFromFile($filename = null)
-    {
-        $registry = new self;
-        $filename = $filename ?: 'routes.json';
-
-        if (! Storage::exists($filename)) return $registry;
-        $routes = json_decode(Storage::get($filename), true);
-        if ($routes === null) return $registry;
-
-        // We want to re-parse config routes to allow route overwriting
-        return $registry->parseRoutes($routes)->parseConfigRoutes();
     }
 
     /**
@@ -120,11 +123,7 @@ class RouteRegistry
             }
 
             $route = new Route($routeDetails);
-
-            collect($routeDetails['actions'])->each(function ($action, $alias) use ($route) {
-                $route->addAction(new Action(array_merge($action, ['alias' => $alias])));
-            });
-
+            $this->apiRegistry->handleRoute($route, $routeDetails);
             $this->addRoute($route);
         });
 

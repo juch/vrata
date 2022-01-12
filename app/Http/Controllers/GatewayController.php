@@ -9,6 +9,7 @@ use App\Services\RestClient;
 use App\Http\Request;
 use Illuminate\Http\Response;
 use Laravel\Lumen\Routing\Controller;
+use Illuminate\Support\Facades\Log;
 
 class GatewayController extends Controller
 {
@@ -46,13 +47,22 @@ class GatewayController extends Controller
         $this->actions = $request
             ->getRoute()
             ->getActions()
+            ->filter(function ($action) use ($request) {
+                // le role ne devrait pas etre appliqué à l'action... l'action n'est pas forcément liée à un provider
+                // peut-etre revoir la construction routes / actions / provider
+                return ($request->getRoute()->isPublic() || $request->userPerimeters->isGranted($action->getRole()));
+            })
+            ->filter(function ($action) use ($request) {
+                // si le header X-SYNAPSES-PROVIDER est fourni, un seul provider est utilisé
+                return ($request->getRoute()->isPublic() || empty($request->providers) || in_array(strtoupper($action->getRole()), $request->providers));
+            })
             ->groupBy(function ($action) {
                 return $action->getSequence();
             })
             ->sortBy(function ($batch, $key) {
-                return intval($key);
+                return (int)$key;
             });
-
+        // Log::info(count($this->actions));
         $this->presenter = $request
             ->getRoute()
             ->getPresenter();
@@ -65,10 +75,10 @@ class GatewayController extends Controller
      */
     public function get(Request $request, RestClient $client)
     {
-        if (! $request->getRoute()->isAggregate()) {
+        if (!$request->getRoute()->isAggregate()) {
             return $this->simpleRequest($request, $client);
         }
-        
+
         return $this->aggregateRequest($request, $client);
     }
 
@@ -78,11 +88,15 @@ class GatewayController extends Controller
      */
     private function rearrangeKeys(array $output)
     {
-        return collect(array_keys($output))->reduce(function($carry, $alias) use ($output) {
+        $needMergeActionsOutput = $this->config['merge_actions_output'] ?? false;
+        // var_dump($this->actions->getConfig()); exit;
+        return collect(array_keys($output))->reduce(function ($carry, $alias) use ($output, $needMergeActionsOutput) {
             $key = $this->config['actions'][$alias]['output_key'] ?? $alias;
 
-            if ($key === false) return $carry;
-
+            if ($key === false) {
+                return $carry;
+            }
+            // var_dump($this->config['actions'][$alias]['input_key']);
             $data = isset($this->config['actions'][$alias]['input_key']) ? $output[$alias][$this->config['actions'][$alias]['input_key']] : $output[$alias];
 
             if (empty($key)) {
@@ -92,16 +106,22 @@ class GatewayController extends Controller
             if (is_string($key)) {
                 array_set($carry, $key, $data);
             }
-
+            // var_dump($data);
             if (is_array($key)) {
-                collect($key)->each(function($outputKey, $property) use (&$data, &$carry, $key) {
+                collect($key)->each(function ($outputKey, $property) use (&$data, &$carry, $key, $needMergeActionsOutput) {
                     if ($property == '*') {
                         array_set($carry, $outputKey, $data);
                         return;
                     }
 
                     if (isset($data[$property])) {
+                        // var_dump($carry);
+                        // if (true === $needMergeActionsOutput && true === is_array(array_get($carry, $outputKey))) {
+                        // exit;
+                        // array_set($carry, $outputKey, array_merge(array_get($carry, $outputKey), $data[$property]));
+                        // } else {
                         array_set($carry, $outputKey, $data[$property]);
+                        // }
                         unset($data[$property]);
                     }
                 });
@@ -118,10 +138,10 @@ class GatewayController extends Controller
      */
     public function delete(Request $request, RestClient $client)
     {
-        if (! $request->getRoute()->isAggregate()) {
+        if (!$request->getRoute()->isAggregate()) {
             return $this->simpleRequest($request, $client);
         }
-        
+
         return $this->aggregateRequest($request, $client);
     }
 
@@ -132,10 +152,10 @@ class GatewayController extends Controller
      */
     public function post(Request $request, RestClient $client)
     {
-        if (! $request->getRoute()->isAggregate()) {
+        if (!$request->getRoute()->isAggregate()) {
             return $this->simpleRequest($request, $client);
         }
-        
+
         return $this->aggregateRequest($request, $client);
     }
 
@@ -146,10 +166,10 @@ class GatewayController extends Controller
      */
     public function put(Request $request, RestClient $client)
     {
-        if (! $request->getRoute()->isAggregate()) {
+        if (!$request->getRoute()->isAggregate()) {
             return $this->simpleRequest($request, $client);
         }
-        
+
         return $this->aggregateRequest($request, $client);
     }
 
@@ -166,7 +186,7 @@ class GatewayController extends Controller
         }
 
         $client->setBody($request->getContent());
-  
+
         if (count($request->allFiles()) !== 0) {
             $client->setFiles($request->allFiles());
         }
@@ -183,19 +203,19 @@ class GatewayController extends Controller
      * @param RestClient $client
      * @return Response
      */
-    private function aggregateRequest(Request $request, RestClient $client) {
-
+    private function aggregateRequest(Request $request, RestClient $client)
+    {
         // Aggregate request
         $parametersJar = array_merge($request->getRouteParams(), ['query_string' => $request->getQueryString()]);
-    
+
         // Initial Body
         if ($request->getContent() != "") {
             $parametersJar = array_merge($parametersJar, $client->setAggregateOriginBody($request->getContent()));
         }
 
-        $output = $this->actions->reduce(function($carry, $batch) use (&$parametersJar, $client) {
+        $output = $this->actions->reduce(function ($carry, $batch) use (&$parametersJar, $client) {
             $responses = $client->asyncRequest($batch, $parametersJar);
-           
+
             $parametersJar = array_merge($parametersJar, $responses->exportParameters());
 
             return array_merge($carry, $responses->getResponses()->toArray());

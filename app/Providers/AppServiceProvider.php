@@ -2,19 +2,18 @@
 
 namespace App\Providers;
 
+use Carbon\Carbon;
 use App\Http\Request;
-use App\Routing\RouteRegistry;
+use GuzzleHttp\Client;
+use App\Routing\ApiRegistry;
 use App\Services\DNSRegistry;
+use App\Routing\RouteRegistry;
+use Laravel\Passport\Passport;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Config;
+use Illuminate\Support\ServiceProvider;
 use App\Services\ServiceRegistryContract;
 use Dusterio\LumenPassport\LumenPassport;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\ServiceProvider;
-use Symfony\Component\HttpFoundation\File\File;
-use Illuminate\Support\Facades\Storage;
-use Laravel\Passport\Passport;
-use Carbon\Carbon;
-use GuzzleHttp\Client;
-use Illuminate\Support\Facades\Config;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -25,8 +24,13 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot()
     {
+        // Collection of providers supported by the API
+        $this->app->singleton(ApiRegistry::class, function() {
+            return new ApiRegistry(collect(Config::get('hub.apis')));
+        });
+
         $this->app->singleton(RouteRegistry::class, function() {
-            return RouteRegistry::initFromFile('routes.json');
+            return new RouteRegistry($this->app->make(ApiRegistry::class));
         });
 
         $this->app->singleton(Request::class, function () {

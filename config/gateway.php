@@ -4,46 +4,81 @@ return (static function() {
     $configTemplate = [
         // List of microservices behind the gateway
         'services' => [
-            'core' => [],
-            'login' => [],
-            'rds' => [],
-            'tpt-salles' => [
-                'hostname' => 'localhost:8081'
-            ],
-            'agro-salles' => [
-                'hostname' => 'localhost:8082'
+            'core' => [
+                'hostname' => '',
+                'path' => '',
             ],
         ],
 
         // Array of extra (eg. aggregated) routes
         'routes' => [
             [
-                'aggregate' => true,
+                'method' => 'POST',
+                'path' => '/user/login',
+                'public' => true,
+                'raw' => false,
+                'merge_actions_output' => false,
+                'actions' => [
+                    'user' => [
+                        'service' => 'core',
+                        'method' => 'GET',
+                        'path' => 'user/{origin%email}',
+                        'sequence' => 0,
+                        'critical' => false,
+                        'input_key' => 'data',
+                        'output_key' => [
+                            'items' => 'items'
+                        ],
+                    ],
+                ],
+            ],
+            [
                 'method' => 'GET',
-                // 'path' => '/v1/salles/{id}',
                 'path' => '/salles',
                 'public' => false,
                 'raw' => false,
+                'merge_actions_output' => true,
                 'actions' => [
-                    'tpt' => [
-                        'service' => 'tpt-salles',
+                    'salle' => [
+                        'service' => 'core',
                         'method' => 'GET',
                         'path' => 'salles',
                         'sequence' => 0,
-                        'output_key' => [
-                            'data' => 'tpt',
-                        ],
                         'critical' => false,
+                        'input_key' => 'data',
+                        'output_key' => [
+                            'items' => 'items'
+                        ],
                     ],
-                    'agro' => [
-                        'service' => 'agro-salles',
-                        'method' => 'GET',
-                        'path' => 'salles',
+                ],
+            ],
+            [
+                'method' => 'POST',
+                'path' => '/reservations',
+                'public' => false,
+                'raw' => false,
+                'merge_actions_output' => true,
+                'actions' => [
+                    'reservations' => [
+                        'service' => 'core',
+                        'method' => 'POST',
+                        'path' => 'reservations',
                         'sequence' => 0,
-                        'output_key' => [
-                            'data' => 'agro',
+                        'critical' => false, // sera critical quand le bon provider sera sélectionné automatiquement
+                        'body' => [ // paramètre pour pouvoir reporter automatiquement tout le body ???
+                            "datedebut" => "{origin%datedebut}",
+                            "datefin" => "{origin%datefin}",
+                            "intitule" => "{origin%intitule}",
+                            "idbeneficiaire" => "{origin%idbeneficiaire}",
+                            "uuidbeneficiaire" => "{origin%uuidbeneficiaire}",
+                            "motif" => "{origin%motif}",
+                            "forcerValidation" => "{origin%forcerValidation}",
+                            "checkAvailability" => "{origin%checkAvailability}",
+                            "idperscreat" => "{origin%idperscreat}",
+                            "idlocal" => "{origin%idlocal}",
+                            "uuidlocal" => "{origin%uuidlocal}"
                         ],
-                        'critical' => false,
+                        'input_key' => 'data'
                     ],
                 ],
             ],
@@ -52,8 +87,9 @@ return (static function() {
         // Global parameters
         'global' => [
             'prefix' => '/v1',
-            'timeout' => 2.0, // in seconds
-            'connect_timeout' => 1.0, // in seconds
+            'timeout' => 120.0, // in seconds
+            'service_timeout' => 5.0, // in seconds
+            'connect_timeout' => 2.0, // in seconds
             'doc_point' => '/api/doc',
             'domain' => 'localhost:8888'
         ],
@@ -62,6 +98,8 @@ return (static function() {
         'headers-forwarded-whitelist' => [
             'X-SYNAPSES-APP',
             'X-SYNAPSES-USER',
+            'X-SYNAPSES-USER-UUID',
+            'X-SYNAPSES-USER-PROVIDER',
         ],
     ];
 

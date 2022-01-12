@@ -39,7 +39,6 @@ class RestClient
      */
     protected $guzzleParams = [
         'headers' => [],
-        'timeout' => 40
     ];
 
     /**
@@ -59,6 +58,8 @@ class RestClient
         $this->services = $services;
         $this->whiteListedHeaders = config('gateway.headers-forwarded-whitelist', []);
         $this->injectHeaders($request);
+        // $this->guzzleParams['timeout'] = config('gateway.global.service_timeout', config('gateway.global.timeout', 40));
+        // $this->guzzleParams['connect_timeout'] = config('gateway.global.connect_timeout', 10);
     }
 
     /**
@@ -227,7 +228,7 @@ class RestClient
             $bodyAsync = $action->getBodyAsync();
 
             if (!is_null($bodyAsync)) {
-                $this->setBody(json_encode($this->injectBodyParams($bodyAsync, $parametersJar)));
+                $this->setBody(json_encode($this->injectBodyParams($bodyAsync, $parametersJar), JSON_NUMERIC_CHECK));
             }
             
             $carry[$action->getAlias()] = $this->client->{$method . 'Async'}($url, $this->guzzleParams);
@@ -248,12 +249,10 @@ class RestClient
      */
     private function processResponses(RestBatchResponse $wrapper, Collection $responses)
     {
-
         // Process successful responses
         $responses->filter(function ($response) {
             return $response['state'] == 'fulfilled';
         })->each(function ($response, $alias) use ($wrapper) {
-
             $wrapper->addSuccessfulAction($alias, $response['value']);
         });
 
@@ -327,7 +326,11 @@ class RestClient
     {
         foreach ($params as $key => $value) {
             foreach ($body as $bodyParam => $bodyValue) {
-                if (is_string($value) || is_numeric($value)) {
+                if (is_string($value) || is_numeric($value) || is_bool ($value)) {
+                    if (is_bool($value)) {
+                        // $value = (bool)$value;
+                        $value = $value ? 1:0;
+                    }
                     $body[$bodyParam] = str_replace("{" . $prefix . $key . "}", $value, $bodyValue);
                 } else if (is_array($value)) {
                     if ($bodyValue == "{" . $prefix . $key . "}") {
@@ -347,34 +350,15 @@ class RestClient
     private function buildUrl(ActionContract $action, $parametersJar)
     {
         $url = $this->injectParams($action->getUrl(), $parametersJar);
-        if ($url[0] != '/') $url = '/' . $url;
-        if (isset($parametersJar['query_string'])) $url .= '?' . $parametersJar['query_string'];
+        if ($url[0] != '/') {
+            $url = '/' . $url;
+        }
+        if (isset($parametersJar['query_string'])) {
+            $url .= '?' . $parametersJar['query_string'];
+        }
 
-        return $this->services->resolveInstance($action->getService()) . $url;
-    }
+        $url = str_replace('//', '/', $this->services->resolveInstance($action->getService()) . $url);
 
-    // /**
-    //  * @param array $body
-    //  * @param array $params
-    //  * @param string $prefix
-    //  * @return array
-    //  */
-    // private function injectBodyParams(array $body, array $params, $prefix = ''): array
-    // {
-    //     foreach ($params as $key => $value) {
-    //         if (is_string($value) || is_numeric($value)) {
-    //             foreach ($body as $bodyParam => $bodyValue) {
-    //                 $body[$bodyParam] = str_replace("{{$prefix}{$key}}", $value, $bodyValue);
-    //             }
-    //         } else if (is_array($value)) {
-    //             foreach ($body as $bodyParam => $bodyValue) {
-    //                 if ($bodyValue === "{{$prefix}{$key}}") {
-    //                     $body[$bodyParam] = $value;
-    //                 }
-    //             }
-    //         }
-    //     }
-
-    //     return $body;
-    // }  
+        return $url;
+    } 
 }
